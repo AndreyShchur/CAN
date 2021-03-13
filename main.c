@@ -1,7 +1,5 @@
 #include "stm32f10x.h"
 
-//#include "stm32f10x_can.h"
-
 #define CAN_MODE    		    (0x03U) 		// silent loop-back
 #define CAN_PRESCALER		    (0U)            // Baud-rate prescaler
 #define CAN_SJW                 (0x01U)         // Resynchronization jump width
@@ -15,7 +13,9 @@ static uint8_t My_CAN_Init(void)
     uint8_t status = 0U;
     
     RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+    
     CAN1->MCR &= ~((uint32_t)CAN_MCR_RESET << 1U); 
+    
     // Set CANTX in ouput push-pull 
     GPIOA->CRH |= GPIO_CRH_MODE12_0;
     // Set CANRX in input mode
@@ -100,6 +100,8 @@ static uint8_t My_CAN_Init(void)
     return status;
 }
 
+
+
 static void My_CAN_FilterInit(void)
 {
     /* Initialisation mode for the filter */
@@ -128,28 +130,33 @@ static void My_CAN_FilterInit(void)
 }
 
 
+
 static void My_CAN_Transmit(uint8_t* mes)
 {
-  if ((CAN1->TSR & CAN_TSR_TME0) == CAN_TSR_TME0)
-  {
-      // Mailbox request
-      CAN1->sTxMailBox[0U].TIR &= (uint32_t)~0x01;
+    if ((CAN1->TSR & CAN_TSR_TME0) == CAN_TSR_TME0)
+    {
+       
+        // Mailbox reset transmit request 
+        CAN1->sTxMailBox[0U].TIR &= (uint32_t)~0x01;
       
-      // set id ant rtr bit
-      uint16_t StdId = 0U;
-      CAN1->sTxMailBox[0U].TIR = (uint32_t)((StdId << 21) | 0x00);
-      
-      /* Set up the DLC */
+        // set id ant rtr bit
+        uint16_t StdId = 0U;
+        CAN1->sTxMailBox[0U].TIR = (uint32_t)((StdId << 21) | 0x00);
+
+        /* Set up the DLC */
         uint8_t dlc = (uint8_t)0x00000001;
         CAN1->sTxMailBox[0U].TDTR &= (uint32_t)0xFFFFFFF0;
         CAN1->sTxMailBox[0U].TDTR |= dlc;
 
         /* Set up the data field */
         CAN1->sTxMailBox[0U].TDLR = ((uint32_t) mes[0]);
-        
+
+        // Mailbox Set transmit request
         CAN1->sTxMailBox[0U].TIR |= (uint32_t)0x01;
-  }
+    }
 }
+
+
 
 static void blink(void)
 {
@@ -179,11 +186,10 @@ int main()
 	uint8_t status = 0U; 
     status = My_CAN_Init();
     if (status)
+    {
         My_CAN_FilterInit();
-    
-    // Set CAN working during debug
-    
-    
+    }
+       
     // Test message for transsmit
     uint8_t message[1U] = {25};
     
@@ -199,24 +205,27 @@ int main()
         }
     }
     
-   uint8_t Data[1] = {0};
     // Receive
+    uint8_t Data[1] = {0};
+    
     /* Get the Id */
-  //uint8_t ide = (uint8_t)0x04 & CAN1->sFIFOMailBox[0U].RIR;
-      uint32_t StdId = (uint32_t)0x000007FF & (CAN1->sFIFOMailBox[0U].RIR >> 21);
+    //uint8_t ide = (uint8_t)0x04 & CAN1->sFIFOMailBox[0U].RIR;
+    uint32_t StdId = (uint32_t)0x000007FF & (CAN1->sFIFOMailBox[0U].RIR >> 21);
     
     uint8_t RTR = (uint8_t)0x02 & CAN1->sFIFOMailBox[0U].RIR;
-  /* Get the DLC */
-  uint8_t DLC = (uint8_t)0x0F & CAN1->sFIFOMailBox[0U].RDTR;
-  /* Get the FMI */
-  uint8_t FMI = (uint8_t)0xFF & (CAN1->sFIFOMailBox[0U].RDTR >> 8);
-  /* Get the data field */
-   Data[0U] = (uint8_t)0xFF & CAN1->sFIFOMailBox[0U].RDLR;
-  /* Release the FIFO */
-  /* Release FIFO0 */
+    
+    /* Get the DLC */
+    uint8_t DLC = (uint8_t)0x0F & CAN1->sFIFOMailBox[0U].RDTR;
+    /* Get the FMI */
+    uint8_t FMI = (uint8_t)0xFF & (CAN1->sFIFOMailBox[0U].RDTR >> 8);
+    /* Get the data field */
+    Data[0U] = (uint8_t)0xFF & CAN1->sFIFOMailBox[0U].RDLR;
+    /* Release the FIFO */
+    /* Release FIFO0 */
     CAN1->RF0R |= CAN_RF0R_RFOM0;
 
-   if (Data[0] == 25)
+    if (Data[0] == 25)
+    {
         blink();
-    
+    }
 }
